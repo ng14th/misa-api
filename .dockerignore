@@ -1,0 +1,11 @@
+*
+!requirements.txt
+!LICENSE
+!main.py
+!auto_checkin.py
+!constant/
+!constant/*.py
+!static/
+!static/*.html
+!static/*.css
+!static/*.js

@@ -66,6 +66,7 @@ Các script `run_checkin.*`, `random_checkin.*` giữ từ repo gốc gọi `aut
 ## 4. Sử dụng giao diện
 
 1. Nhập **Username** (tài khoản/số điện thoại MISA), **Password**, **SECRET_KEY** nếu cần, và **Mã nhân viên**.
+   Nút **Hiện/Ẩn** cạnh ô Password cho phép bật/tắt hiển thị mật khẩu.
 2. Kiểm tra dòng thông tin thiết bị do trình duyệt báo.
 3. Chọn **Vị trí chấm công**, hoặc mở **Sử dụng GPS hiện tại**, cấp quyền vị trí và nhập tên địa điểm GPS. GPS trình duyệt cần HTTPS hoặc localhost.
 4. Tùy chọn bật **Nhớ tất cả thông tin đã nhập**.
@@ -200,9 +201,13 @@ API ứng dụng tham khảo từ repo gốc, không thuộc hợp đồng OpenA
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
 node --test tests/test_form.mjs
+ruff check .
+ruff format --check .
 ```
 
 Kiểm thử dùng HTTP mock, không đăng nhập/chấm công thật. Bao gồm đăng nhập/OTP, chuẩn hóa khóa, mã nhân viên, header thiết bị, tọa độ, lỗi kết nối, không lộ bí mật trong lỗi, prefix reverse proxy và lưu/khôi phục dữ liệu form.
+
+Python dùng Ruff để format và kiểm tra PEP 8, giới hạn 79 ký tự/dòng, sắp xếp import. Chạy `ruff check --fix .` và `ruff format .` trước khi commit; cấu hình nằm trong `ruff.toml`.
 
 ## Giấy phép
 

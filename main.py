@@ -17,10 +17,19 @@ app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError):
     # Do not echo credential input in validation errors.
-    return JSONResponse(status_code=422, content={"detail": [
-        {"loc": error["loc"], "type": error["type"], "msg": "Dữ liệu không hợp lệ."}
-        for error in exc.errors()
-    ]})
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": [
+                {
+                    "loc": error["loc"],
+                    "type": error["type"],
+                    "msg": "Dữ liệu không hợp lệ.",
+                }
+                for error in exc.errors()
+            ]
+        },
+    )
 
 
 @app.middleware("http")
@@ -48,13 +57,21 @@ async def health():
 @app.get("/api/locations")
 async def locations():
     return [
-        {"name": name, "label": location.MAPPING_NAME_LOCALTION.get(name, name),
-         "latitude": coordinates[0], "longitude": coordinates[1]}
+        {
+            "name": name,
+            "label": location.MAPPING_NAME_LOCALTION.get(name, name),
+            "latitude": coordinates[0],
+            "longitude": coordinates[1],
+        }
         for name, coordinates in vars(location).items()
-        if name.isupper() and isinstance(coordinates, tuple) and len(coordinates) == 2
+        if name.isupper()
+        and isinstance(coordinates, tuple)
+        and len(coordinates) == 2
     ]
 
 
 @app.post("/api/checkins")
-async def check_in(entry: CheckInRequest, client: httpx.AsyncClient = Depends(get_http_client)):
+async def check_in(
+    entry: CheckInRequest, client: httpx.AsyncClient = Depends(get_http_client)
+):
     return await run_workflow(entry, client)

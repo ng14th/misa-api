@@ -27,7 +27,10 @@
             <label for="username">Username <span class="required">*</span></label>
             <input id="username" name="username" maxlength="255" placeholder="Số điện thoại hoặc tài khoản MISA" required>
             <label for="password">Password <span class="required">*</span></label>
-            <input id="password" name="password" type="password" required>
+            <div class="password-field">
+              <input id="password" name="password" type="password" required>
+              <button id="toggle-password" type="button" aria-label="Hiện mật khẩu" aria-pressed="false" aria-controls="password">Hiện</button>
+            </div>
             <label for="secret-key">SECRET_KEY (TOTP)</label>
             <input id="secret-key" name="secret_key" type="password" placeholder="Nhập khi tài khoản yêu cầu xác thực OTP">
             <p class="hint">Khóa thiết lập ứng dụng xác thực của tài khoản MISA (Base32: A–Z, 2–7), không phải mã OTP 6 số.</p>

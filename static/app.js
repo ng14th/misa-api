@@ -11,6 +11,16 @@ const storageKey = 'misa-checkin-inputs';
 const rememberedFields = ['username', 'password', 'secret-key', 'employee-code', 'gps-name'];
 let savedLocation = '';
 
+document.querySelector('#toggle-password').addEventListener('click', () => {
+  const password = document.querySelector('#password');
+  const button = document.querySelector('#toggle-password');
+  const show = password.type === 'password';
+  password.type = show ? 'text' : 'password';
+  button.textContent = show ? 'Ẩn' : 'Hiện';
+  button.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+  button.setAttribute('aria-pressed', String(show));
+});
+
 async function collectDeviceInfo() {
   const ua = navigator.userAgent || '';
   const uaData = navigator.userAgentData;

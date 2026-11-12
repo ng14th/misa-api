@@ -13,9 +13,11 @@ async function setup(storage = new Map(), failRequest = false, blockStorage = fa
       classList: {toggle() {}, add() {}},
       addEventListener(type, handler) { this.listeners[type] = handler; },
       add(option) { this.options.push(option); },
+      setAttribute(name, value) { this[name] = value; },
     });
     return elements.get(selector);
   };
+  element('#password').type = 'password';
   let sent;
   const context = vm.createContext({
     document: {querySelector: element}, Intl, Date, setInterval() {}, navigator: browserInfo,
@@ -97,6 +99,23 @@ test('desktop sends browser-reported device and actual user agent', async () => 
     name: 'MacIntel', os: 'macOS', os_version: '14.0', device_type: 'Desktop',
     user_agent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Safari/605.1.15',
   });
+});
+
+test('password visibility toggles without changing value or submitting', async () => {
+  const page = await setup();
+  page.fill();
+  const password = page.element('#password');
+  const toggle = page.element('#toggle-password');
+  toggle.listeners.click();
+  assert.equal(password.type, 'text');
+  assert.equal(password.value, 'test-password');
+  assert.equal(toggle['aria-pressed'], 'true');
+  assert.equal(toggle['aria-label'], 'Ẩn mật khẩu');
+  toggle.listeners.click();
+  assert.equal(password.type, 'password');
+  assert.equal(password.value, 'test-password');
+  assert.equal(toggle['aria-pressed'], 'false');
+  assert.equal(page.sent(), undefined);
 });
 
 test('Client Hints supplies model and platform version for smartphone', async () => {

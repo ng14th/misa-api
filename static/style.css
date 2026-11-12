@@ -3,3 +3,5 @@
 fieldset{border:0;padding:0;margin:0;min-width:0}legend{font-size:11px;color:#647c88;margin-bottom:4px}
 
 .remember{display:flex;align-items:center;gap:9px;cursor:pointer}.remember input{width:16px;height:16px;margin:0;accent-color:#167565}
+
+.password-field{position:relative}.password-field input{padding-right:74px}.password-field button{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;color:#167565;padding:7px;font-size:12px;border-radius:5px}

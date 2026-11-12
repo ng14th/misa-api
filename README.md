@@ -3,17 +3,16 @@
 Webapp FastAPI để đăng nhập tài khoản MISA AMIS, xác thực TOTP nếu cần và chấm công theo ca làm hiện tại. Giao diện tiếng Việt, nhập tài khoản trực tiếp, chọn vị trí và gửi thông tin thiết bị mà trình duyệt đang sử dụng cung cấp.
 
 - Mã nguồn: https://github.com/ng14th/misa-api
-- Bản triển khai: https://lab14.io.vn/misa/
 - Dựa trên [vuvanthe64/Misa-Auto-Checkin](https://github.com/vuvanthe64/Misa-Auto-Checkin), giữ lịch sử Git và giấy phép MIT.
 
 ## 1. Chuẩn bị
 
 - Tài khoản MISA có quyền chấm công và mã nhân viên tương ứng.
 - Điện thoại có Google Authenticator nếu tài khoản bật xác thực hai yếu tố bằng ứng dụng.
-- Python 3.11+ để chạy trực tiếp, hoặc Docker Engine/Desktop kèm Docker Compose v2.
+- Python 3.11+ để chạy trực tiếp, hoặc Docker Engine/Desktop.
 - Node.js 18+ chỉ cần khi chạy kiểm thử giao diện.
 
-Ứng dụng không đọc `.env` và không cần `X_CLIENTID`/`X_SECRET_KEY`. Không đưa mật khẩu, khóa TOTP hoặc token Cloudflare vào mã nguồn.
+Ứng dụng không đọc `.env` và không cần `X_CLIENTID`/`X_SECRET_KEY`. Không đưa mật khẩu hoặc khóa TOTP vào mã nguồn.
 
 ## 2. Lấy SECRET_KEY cho TOTP
 
@@ -74,7 +73,7 @@ Các script `run_checkin.*`, `random_checkin.*` giữ từ repo gốc gọi `aut
 
 API chấm công theo `userId` của tài khoản đăng nhập. Mã nhân viên dùng đối chiếu khi MISA trả `EmployeeCode`; nếu không khớp thì dừng. Nếu MISA không trả mã, mã nhập chỉ dùng hiển thị kết quả, không chuyển sang tài khoản nhân viên khác.
 
-Checkbox ghi nhớ mặc định tắt. Khi bật, username, password, SECRET_KEY, mã nhân viên, vị trí, tọa độ và tên GPS được lưu vào **localStorage trên trình duyệt này**, gồm bí mật ở dạng JavaScript cùng origin có thể đọc. Chỉ bật trên máy cá nhân. Bỏ chọn để xóa dữ liệu đã lưu. Khi không bật ghi nhớ, password và SECRET_KEY bị xóa khỏi form sau lần gửi. Dữ liệu nhớ trên localhost không tự chuyển sang domain hoặc trình duyệt khác.
+Checkbox ghi nhớ mặc định tắt. Khi bật, username, password, SECRET_KEY, mã nhân viên, vị trí, tọa độ và tên GPS được lưu vào **localStorage trên trình duyệt này**, gồm bí mật ở dạng JavaScript cùng origin có thể đọc. Chỉ bật trên máy cá nhân. Bỏ chọn để xóa dữ liệu đã lưu. Khi không bật ghi nhớ, password và SECRET_KEY bị xóa khỏi form sau lần gửi. Dữ liệu ghi nhớ chỉ áp dụng cho trình duyệt và địa chỉ local đang sử dụng.
 
 ### Cấu hình danh sách vị trí
 
@@ -105,62 +104,9 @@ docker build -t misa-amis:local .
 docker run --rm --name misa-local -p 127.0.0.1:8000:8000 misa-amis:local uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-Mở http://127.0.0.1:8000. Lệnh override Uvicorn bỏ prefix `/misa` vì đang chạy trực tiếp.
+Mở http://127.0.0.1:8000. Lệnh trên chạy backend trực tiếp trên cổng 8000.
 
-### Chạy với Nginx gateway và Cloudflare Tunnel
-
-Compose mặc định dành cho route `/misa/`: container `misa-amis`, không publish cổng host, tham gia Docker network ngoài `nginx_default`. Nếu setup mới, tạo network trước; nếu đã có gateway thì dùng lại network đó:
-
-```bash
-docker network inspect nginx_default
-# Chỉ chạy lệnh sau nếu network chưa tồn tại:
-docker network create nginx_default
-docker compose up -d --build --wait
-docker compose ps
-```
-
-Nginx gateway phải nằm cùng network để resolve `misa-amis`. Trong server block của domain, thêm các location trong `deploy/nginx-misa.conf`. Nginx bỏ `/misa` trước khi chuyển tới backend; Uvicorn chạy với `--root-path /misa`. URL static/API dùng đường dẫn tương đối để hoạt động cả localhost và `/misa/`.
-
-Nếu gateway chặn quyền GPS bằng Permissions-Policy, cấu hình trong khối `http`:
-
-```nginx
-map $request_uri $permissions_policy {
-    default "geolocation=(), microphone=(), camera=()";
-    ~^/misa(/|$) "geolocation=(self), microphone=(), camera=()";
-}
-```
-
-Trong server block, thay header Permissions-Policy cũ bằng:
-
-```nginx
-add_header Permissions-Policy $permissions_policy always;
-```
-
-Kiểm tra trước khi reload:
-
-```bash
-docker exec nginx-gateway nginx -t
-docker exec nginx-gateway nginx -s reload
-```
-
-Với Cloudflare Tunnel hiện có, public hostname `lab14.io.vn` phải chuyển về Nginx gateway ở cổng 80. Nếu tunnel ở cùng Docker network có thể dùng `http://nginx-gateway:80`; nếu gateway publish cổng trên Docker Desktop, có thể dùng origin `http://host.docker.internal:80` như cấu hình hệ thống phù hợp. Dùng tunnel đã cấu hình trong Cloudflare; không commit tunnel token vào repo. Location MISA chuyển HTTP sang HTTPS và dùng HTTPS cho giao diện nhập bí mật.
-
-Truy cập https://lab14.io.vn/misa/; `/misa` được chuyển sang `/misa/`. Kiểm tra:
-
-```bash
-curl -f https://lab14.io.vn/misa/healthz
-curl -f https://lab14.io.vn/misa/api/locations
-docker compose logs --tail 50 misa
-```
-
-Cập nhật code/vị trí và triển khai lại:
-
-```bash
-git pull --ff-only
-docker compose up -d --build --wait
-```
-
-`.dockerignore` chỉ đưa file ứng dụng cần thiết vào image; loại `.env`, `.git` và dữ liệu local. Container chạy user thường, filesystem read-only, health check và tự restart. Sau khi sửa Nginx, luôn chạy `nginx -t` rồi mới reload. Để dừng riêng app: `docker compose down`; nếu gỡ route, chỉ gỡ block MISA khỏi Nginx để giữ các dịch vụ khác.
+Sau khi cập nhật code hoặc vị trí, dừng container bằng `Ctrl+C`, build lại image và chạy lại lệnh trên. `.dockerignore` loại `.env`, `.git` và dữ liệu local khỏi image.
 
 ## 6. API và cấu trúc mã
 
@@ -171,13 +117,13 @@ docker compose up -d --build --wait
 | `GET /api/locations` | Key, tên hiển thị và tọa độ |
 | `POST /api/checkins` | Tài khoản, mã nhân viên, GPS và device từ form |
 
-Khi triển khai qua gateway, thêm prefix `/misa` cho các endpoint. Swagger local ở http://127.0.0.1:8000/docs; JSON schema ở `/openapi.json`. API POST yêu cầu `username`, `password`, `employee_code`, `latitude`, `longitude`, `gps_name`, `device`; `secret_key` chỉ cần nếu MISA yêu cầu OTP. Device gồm `name`, `os`, `os_version` (có thể trống), `device_type` (Desktop/Smartphone/Tablet/Unknown), `user_agent`.
+Swagger local ở http://127.0.0.1:8000/docs; JSON schema ở `/openapi.json`. API POST yêu cầu `username`, `password`, `employee_code`, `latitude`, `longitude`, `gps_name`, `device`; `secret_key` chỉ cần nếu MISA yêu cầu OTP. Device gồm `name`, `os`, `os_version` (có thể trống), `device_type` (Desktop/Smartphone/Tablet/Unknown), `user_agent`.
 
 - `auto_checkin.py`: model dữ liệu, đăng nhập, TOTP, ca làm, ký response token và chấm công.
 - `main.py`: FastAPI, static, API vị trí, validation và HTTP client riêng mỗi request.
 - `static/`: giao diện, thu thập device, ghi nhớ trên trình duyệt.
 - `constant/location.py`: các địa điểm cấu hình.
-- `Dockerfile`, `compose.yaml`, `deploy/nginx-misa.conf`: triển khai.
+- `Dockerfile`, `.dockerignore`: đóng gói ứng dụng để chạy local bằng Docker.
 - `tests/`: mock MISA và kiểm thử frontend.
 
 ## 7. Lỗi thường gặp
@@ -188,12 +134,11 @@ Khi triển khai qua gateway, thêm prefix `/misa` cho các endpoint. Swagger lo
 | SECRET_KEY không đúng Base32 | Copy lại khóa; khoảng trắng/chữ thường được xử lý tự động. Không dán toàn bộ URL QR vào ô khóa. |
 | MISA từ chối xác thực OTP | Kiểm tra khóa thuộc đúng tài khoản, đã hoàn tất liên kết và đồng hồ hệ thống đồng bộ. |
 | Mã nhân viên không khớp | Dùng mã nhân viên thuộc tài khoản vừa đăng nhập. |
-| Không lấy được GPS | Cấp quyền vị trí, dùng HTTPS/localhost và kiểm tra Permissions-Policy ở gateway. |
+| Không lấy được GPS | Mở ứng dụng bằng localhost và cấp quyền vị trí trong trình duyệt/hệ điều hành. |
 | Timeout / mất kết nối / thiếu kết quả | Kiểm tra bản ghi trên AMIS trước khi gửi lại; ứng dụng không tự retry. |
 | Thiếu thông tin device sau cập nhật | Tải lại trang để frontend mới gửi đủ dữ liệu. |
-| 502 tại gateway | Kiểm tra container healthy, network Nginx và tên upstream `misa-amis`. |
 
-API ứng dụng tham khảo từ repo gốc, không thuộc hợp đồng OpenAPI trong PDF; có thể thay đổi từ phía MISA. Không đảm bảo server MISA ghi nguồn `DataSourceID = 3`. Backend không ghi mật khẩu/khóa vào file hoặc database, không tái sử dụng phiên giữa người dùng. Nếu ca làm trả yêu cầu nhận diện khuôn mặt/xác nhận quản lý, app dừng và hướng dẫn dùng ứng dụng MISA. Bản này chưa có lớp đăng nhập riêng cho webapp; triển khai trong phạm vi được phép và bảo vệ đường truyền HTTPS.
+API ứng dụng tham khảo từ repo gốc, không thuộc hợp đồng OpenAPI trong PDF; có thể thay đổi từ phía MISA. Không đảm bảo server MISA ghi nguồn `DataSourceID = 3`. Backend không ghi mật khẩu/khóa vào file hoặc database, không tái sử dụng phiên giữa người dùng. Nếu ca làm trả yêu cầu nhận diện khuôn mặt/xác nhận quản lý, app dừng và hướng dẫn dùng ứng dụng MISA. Bản này chưa có lớp đăng nhập riêng cho webapp; mặc định chỉ chạy trên địa chỉ local `127.0.0.1`.
 
 ## 8. Kiểm thử
 
@@ -205,7 +150,7 @@ ruff check .
 ruff format --check .
 ```
 
-Kiểm thử dùng HTTP mock, không đăng nhập/chấm công thật. Bao gồm đăng nhập/OTP, chuẩn hóa khóa, mã nhân viên, header thiết bị, tọa độ, lỗi kết nối, không lộ bí mật trong lỗi, prefix reverse proxy và lưu/khôi phục dữ liệu form.
+Kiểm thử dùng HTTP mock, không đăng nhập/chấm công thật. Bao gồm đăng nhập/OTP, chuẩn hóa khóa, mã nhân viên, header thiết bị, tọa độ, lỗi kết nối, không lộ bí mật trong lỗi, lưu/khôi phục dữ liệu form và bật/tắt hiển thị mật khẩu.
 
 Python dùng Ruff để format và kiểm tra PEP 8, giới hạn 79 ký tự/dòng, sắp xếp import. Chạy `ruff check --fix .` và `ruff format .` trước khi commit; cấu hình nằm trong `ruff.toml`.
 

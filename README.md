@@ -1,339 +1,209 @@
-# 🎯 MISA AMIS Auto Checkin Tool
+# MISA API — Webapp chấm công
 
-Tool tự động chấm công cho hệ thống MISA AMIS với khả năng chống block và hỗ trợ xác thực 2FA (OTP).
+Webapp FastAPI để đăng nhập tài khoản MISA AMIS, xác thực TOTP nếu cần và chấm công theo ca làm hiện tại. Giao diện tiếng Việt, nhập tài khoản trực tiếp, chọn vị trí và gửi thông tin thiết bị mà trình duyệt đang sử dụng cung cấp.
 
-## ✨ Tính năng
+- Mã nguồn: https://github.com/ng14th/misa-api
+- Bản triển khai: https://lab14.io.vn/misa/
+- Dựa trên [vuvanthe64/Misa-Auto-Checkin](https://github.com/vuvanthe64/Misa-Auto-Checkin), giữ lịch sử Git và giấy phép MIT.
 
-- ✅ Tự động đăng nhập MISA AMIS
-- ✅ Hỗ trợ xác thực 2FA với Google Authenticator
-- ✅ Tự động lấy ca làm việc
-- ✅ Gửi tọa độ GPS để chấm công
-- ✅ Chống block với token mã hóa
-- ✅ **Random device headers** - Tự động đổi thiết bị iOS để tránh bị phát hiện
-- ✅ **Random thời gian chấm công** - Không chấm đúng giờ cố định, tránh pattern
-- ✅ Hỗ trợ đa nền tảng (Windows, macOS, Linux)
+## 1. Chuẩn bị
 
-## 📋 Yêu cầu hệ thống
+- Tài khoản MISA có quyền chấm công và mã nhân viên tương ứng.
+- Điện thoại có Google Authenticator nếu tài khoản bật xác thực hai yếu tố bằng ứng dụng.
+- Python 3.11+ để chạy trực tiếp, hoặc Docker Engine/Desktop kèm Docker Compose v2.
+- Node.js 18+ chỉ cần khi chạy kiểm thử giao diện.
 
-- Python 3.7 trở lên
-- Kết nối Internet
+Ứng dụng không đọc `.env` và không cần `X_CLIENTID`/`X_SECRET_KEY`. Không đưa mật khẩu, khóa TOTP hoặc token Cloudflare vào mã nguồn.
 
-## 🚀 Hướng dẫn cài đặt
+## 2. Lấy SECRET_KEY cho TOTP
 
-### 1. Clone repository
+### Phân biệt khóa và mã OTP
+
+**SECRET_KEY** là khóa thiết lập ứng dụng xác thực, thường gồm chữ A–Z và số 2–7. **OTP** là mã 6 số thay đổi theo thời gian mà Authenticator sinh ra. Ô SECRET_KEY cần khóa thiết lập; không nhập mã OTP 6 số vào ô này.
+
+### Thiết lập trên MISA ID
+
+1. Mở [MISA ID](https://id.misa.vn) và đăng nhập tài khoản MISA của bạn.
+2. Vào mục **Bảo mật / Bảo vệ tài khoản → Xác thực hai yếu tố → Ứng dụng xác thực / Google Authenticator → Thiết lập**. Tên mục có thể khác theo giao diện tài khoản. Có thể truy cập từ avatar trong AMIS → **Thiết lập bảo mật**.
+3. Nhập mật khẩu khi được yêu cầu.
+4. Tại màn hình **Thiết lập Ứng dụng xác thực**, ở **B2: Quét mã QR**, chọn **Không thể quét mã này?** nếu khóa chưa hiển thị.
+5. Tìm ô chứa chuỗi ký tự ngay dưới dòng hướng dẫn **Nhập tên tài khoản, mã bên dưới và nhấn Thêm**. Nhấn biểu tượng copy cạnh ô: đó là khóa cần điền vào SECRET_KEY của webapp.
+6. Trên Google Authenticator, nhấn **+ → Quét mã QR**, hoặc **Nhập khóa thiết lập**, nhập tên tài khoản và khóa vừa lấy, chọn loại dựa trên thời gian nếu ứng dụng yêu cầu.
+7. Trở lại MISA, tại **B3: Nhập mã xác nhận**, nhập mã 6 số hiện trong Authenticator rồi nhấn **Tiếp theo** để hoàn tất liên kết.
+8. Điền khóa thiết lập đã copy ở bước 5 vào ô **SECRET_KEY (TOTP)** trên webapp. Chấp nhận chữ thường và khoảng trắng giữa các nhóm ký tự; server tự chuẩn hóa trước khi sinh OTP.
+
+Tham khảo chính thức: [MISA — thiết lập phương thức xác thực](https://helpamis.misa.vn/amis-cham-cong/kb/huong-dan-nguoi-dung-truy-cap-misa-id-thiet-lap-them-phuong-thuc-xac-thuc-du-phong/).
+
+### Đã liên kết Authenticator nhưng không lưu khóa
+
+Không thể suy ngược SECRET_KEY từ mã OTP 6 số. Nếu không còn màn hình hiển thị khóa, dùng phần bảo mật MISA ID để thiết lập lại phương thức Google Authenticator theo hướng dẫn MISA. Trước khi làm, bảo đảm còn quyền truy cập email/số điện thoại xác thực dự phòng. Sau khi thiết lập lại, quét QR mới, hoàn tất xác nhận và cập nhật khóa mới trong webapp; mục Authenticator cũ có thể không còn hợp lệ.
+
+Nếu không thể đăng nhập bằng phương thức dự phòng, liên hệ MISA để khôi phục. Xem [FAQ bảo mật hai lớp MISA ID](https://helpid.misa.vn/kb/cau-hoi-thuong-gap-khi-thiet-lap-bao-mat-2-lop-2fa-tren-misa-id/).
+
+QR và SECRET_KEY đều là bí mật xác thực: không gửi vào issue, commit, ảnh README hay chat. Nếu đã lộ, thiết lập lại để đổi khóa. Có thể để trống SECRET_KEY khi tài khoản đăng nhập không yêu cầu TOTP.
+
+## 3. Chạy trực tiếp
 
 ```bash
-git clone https://github.com/yourusername/Misa-Auto-Checkin.git
-cd Misa-Auto-Checkin
-```
-
-### 2. Cài đặt Python
-
-#### Windows:
-1. Tải Python từ https://www.python.org/downloads/
-2. **Quan trọng**: Chọn "Add Python to PATH" khi cài đặt
-3. Kiểm tra cài đặt thành công:
-   ```cmd
-   python --version
-   ```
-
-#### macOS:
-Python thường đã có sẵn. Nếu chưa có, cài đặt bằng Homebrew:
-```bash
-brew install python3
-```
-
-Kiểm tra:
-```bash
-python3 --version
-```
-
-#### Linux (Ubuntu/Debian):
-```bash
-sudo apt update
-sudo apt install python3 python3-pip
-```
-
-### 3. Cài đặt thư viện phụ thuộc
-
-#### Windows:
-```cmd
-pip install -r requirements.txt
-```
-
-#### macOS/Linux:
-```bash
-pip3 install -r requirements.txt
-```
-
-## ⚙️ Cấu hình
-
-### 1. Lấy Secret Key cho 2FA
-
-1. Đăng nhập MISA AMIS trên web
-2. Vào **Cài đặt** → **Bảo mật** → **Xác thực hai yếu tố**
-3. Chọn **Cài đặt ứng dụng xác thực**
-4. Copy **Secret Key** (dạng: `UPQXZRDKNZY2OJJZLF7A5RQKEV6IHDCX`)
-
-### 2. Tạo file cấu hình
-
-1. Copy file mẫu:
-
-   **Windows (CMD):**
-   ```cmd
-   copy .env.example .env
-   ```
-
-   **macOS/Linux:**
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Mở file `.env` bằng text editor yêu thích (Notepad++, VSCode, nano, vim...)
-
-3. Điền thông tin của bạn:
-
-```env
-# Thông tin đăng nhập
-MISA_USERNAME=0973103206          # Số điện thoại hoặc username MISA
-MISA_PASSWORD=your_password       # Mật khẩu đăng nhập
-MISA_SECRET_KEY=UPQXZRDKNZY2OJJZ  # Secret key từ bước 1
-
-# Thông tin GPS
-TARGET_GPS_NAME=VP Trà Khúc       # Tên địa điểm chấm công
-TARGET_LATITUDE=10.805944         # Vĩ độ
-TARGET_LONGITUDE=106.665083       # Kinh độ
-```
-
-### 3. Lấy tọa độ GPS
-
-**Cách 1: Dùng Google Maps**
-1. Truy cập https://www.google.com/maps
-2. Nhấp chuột phải vào địa điểm công ty
-3. Chọn tọa độ hiển thị ở đầu menu (vd: `10.805944, 106.665083`)
-4. Copy vào file `.env`
-
-**Cách 2: Dùng điện thoại**
-1. Mở Google Maps trên điện thoại
-2. Nhấn giữ vào vị trí công ty
-3. Xem tọa độ ở thanh tìm kiếm
-
-## 🧪 Test chạy thử ngay (sau khi cài đặt xong)
-
-Sau khi cấu hình file `.env` xong, test thử để đảm bảo mọi thứ hoạt động:
-
-### Windows:
-```cmd
-# Cách 1: Chạy trực tiếp
+git clone https://github.com/ng14th/misa-api.git
+cd misa-api
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 python auto_checkin.py
-
-# Cách 2: Dùng batch file
-run_checkin.bat
-
-# Cách 3: Test random (sẽ sleep 30-60 giây trước khi chấm)
-random_checkin.bat 30 60
 ```
 
-### macOS/Linux:
+Windows PowerShell: thay lệnh kích hoạt bằng `.\.venv\Scripts\Activate.ps1`, dùng `python` thay `python3` nếu phù hợp với cài đặt Python của máy.
+
+Mở http://127.0.0.1:8000. Chế độ phát triển tự reload:
+
 ```bash
-# Cách 1: Chạy trực tiếp
-python3 auto_checkin.py
-
-# Cách 2: Dùng shell script
-./run_checkin.sh
-
-# Cách 3: Test random (sẽ sleep 30-60 giây trước khi chấm)
-./random_checkin.sh 30 60
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### Kết quả mong đợi
+Các script `run_checkin.*`, `random_checkin.*` giữ từ repo gốc gọi `auto_checkin.py`; file này hiện mở webserver. Chúng không còn tự chấm công từ `.env`; không cần dùng script random để vận hành webapp.
 
+## 4. Sử dụng giao diện
+
+1. Nhập **Username** (tài khoản/số điện thoại MISA), **Password**, **SECRET_KEY** nếu cần, và **Mã nhân viên**.
+2. Kiểm tra dòng thông tin thiết bị do trình duyệt báo.
+3. Chọn **Vị trí chấm công**, hoặc mở **Sử dụng GPS hiện tại**, cấp quyền vị trí và nhập tên địa điểm GPS. GPS trình duyệt cần HTTPS hoặc localhost.
+4. Tùy chọn bật **Nhớ tất cả thông tin đã nhập**.
+5. Bấm **Ghi nhận chấm công** và chờ kết quả. Thời gian, ca làm lấy từ MISA, không đặt thời gian thủ công.
+
+API chấm công theo `userId` của tài khoản đăng nhập. Mã nhân viên dùng đối chiếu khi MISA trả `EmployeeCode`; nếu không khớp thì dừng. Nếu MISA không trả mã, mã nhập chỉ dùng hiển thị kết quả, không chuyển sang tài khoản nhân viên khác.
+
+Checkbox ghi nhớ mặc định tắt. Khi bật, username, password, SECRET_KEY, mã nhân viên, vị trí, tọa độ và tên GPS được lưu vào **localStorage trên trình duyệt này**, gồm bí mật ở dạng JavaScript cùng origin có thể đọc. Chỉ bật trên máy cá nhân. Bỏ chọn để xóa dữ liệu đã lưu. Khi không bật ghi nhớ, password và SECRET_KEY bị xóa khỏi form sau lần gửi. Dữ liệu nhớ trên localhost không tự chuyển sang domain hoặc trình duyệt khác.
+
+### Cấu hình danh sách vị trí
+
+Sửa `constant/location.py`, tuple theo thứ tự **(latitude, longitude)**:
+
+```python
+VPTRAKHUC = (10.805939, 106.665093)
+
+MAPPING_NAME_LOCALTION = {
+    "VPTRAKHUC": "VP Trà Khúc",
+}
 ```
-============================================================
-    TOOL AUTO CHẤM CÔNG MISA AMIS - V3 (ANTI BLOCK)
-============================================================
 
-[*] BƯỚC 1: Gửi request đăng nhập cơ bản...
-[+] Đăng nhập thành công (Bỏ qua OTP).
+Dropdown hiển thị **VP Trà Khúc**, gửi `GPSName` là **VPTRAKHUC**. Giữ đúng tên biến `MAPPING_NAME_LOCALTION` hiện có. Khởi động lại server hoặc rebuild container sau khi sửa, rồi tải lại trang.
 
-[*] BƯỚC 3: Đang lấy thông tin ca làm việc (Shift ID & Token)...
-[+] Lấy ca thành công: Ca sáng (ID: 12345)
+### Thông tin thiết bị
 
-[*] BƯỚC 4: Bắt đầu quá trình Chấm Công (Gửi tọa độ GPS)...
+Frontend lấy `navigator.userAgent`, `navigator.platform` và User-Agent Client Hints nếu trình duyệt hỗ trợ, gửi object `device` cùng request. Backend dùng dữ liệu đó cho `DeviceName`, `DeviceOS`, `OSVersion` (nếu có), `DeviceType` và `User-Agent` trong các request tới MISA. Không còn danh sách iPhone hoặc chọn thiết bị ngẫu nhiên trong code. `IsMobile` được đặt theo loại thiết bị trình duyệt báo: smartphone/tablet là true, desktop là false.
 
-[========================================================]
-   🎉 CHẤM CÔNG THÀNH CÔNG RỰC RỠ! 🎉
-    Thời gian: 2024-01-15 08:30:00
-    Vị trí: VP Trà Khúc
-    Ca làm: Ca sáng
-[========================================================]
-```
+Đây là thông tin do trình duyệt cung cấp, không phải chứng thực phần cứng. Trình duyệt có thể giới hạn model/version; nếu không cung cấp model, ứng dụng dùng tên nền tảng được báo, không tự suy đoán model máy. Thiết bị được đọc lại khi mở trang và không nằm trong dữ liệu ghi nhớ. Tham khảo [MDN User-Agent Client Hints](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/userAgentData).
 
-## 🤖 Tự động hóa (Quan trọng: Dùng random để tránh bị phát hiện)
+## 5. Docker
 
-### 🎲 Chấm công với thời gian ngẫu nhiên (Khuyến nghị)
+### Chạy thử độc lập trên máy
 
-Thay vì chấm công đúng 8:00 sáng mỗi ngày (dễ bị phát hiện), nên random thời gian trong khoảng:
-- **Sáng**: 8:00 - 8:15 (random 0-15 phút)
-- **Chiều**: 17:45 - 18:15 (random 0-30 phút)
-
-Tool cung cấp script `random_checkin.sh` / `random_checkin.bat` để làm điều này.
-
-### Windows Task Scheduler (với Random)
-
-#### Cách 1: Dùng random script (Khuyến nghị)
-
-1. Mở **Task Scheduler** (Tìm kiếm trong Start Menu)
-2. Chọn **Create Basic Task**
-3. Đặt tên: `MISA Auto Checkin Morning`
-4. Trigger: **Daily** → Chọn **8:00 AM** (script sẽ tự random thêm 0-15 phút)
-5. Action: **Start a program**
-   - Program: `C:\Windows\System32\cmd.exe`
-   - Add arguments: `/c "cd /d C:\Users\YourName\Misa-Auto-Checkin && random_checkin.bat 0 900"`
-     - `0 900` = random từ 0-900 giây (0-15 phút)
-   - Start in: `C:\Users\YourName\Misa-Auto-Checkin`
-6. Finish
-
-**Tạo task cho buổi chiều:**
-- Tên: `MISA Auto Checkin Evening`
-- Trigger: **Daily** → **5:45 PM**
-- Arguments: `/c "cd /d C:\Users\YourName\Misa-Auto-Checkin && random_checkin.bat 0 1800"`
-  - `0 1800` = random từ 0-1800 giây (0-30 phút)
-
-#### Cách 2: Chạy trực tiếp (không random)
-
-Nếu muốn chấm công đúng giờ cố định:
-- Program: `python.exe` hoặc `C:\Python3X\python.exe`
-- Add arguments: `auto_checkin.py`
-- Start in: `C:\Users\YourName\Misa-Auto-Checkin`
-
-### macOS/Linux Cron (với Random)
-
-#### Cách 1: Dùng random script (Khuyến nghị)
-
-1. Mở terminal và chỉnh sửa crontab:
-   ```bash
-   crontab -e
-   ```
-
-2. Thêm các dòng sau:
-   ```cron
-   # Chấm công sáng: 8:00-8:15 (random 0-900 giây = 0-15 phút), thứ 2-6
-   0 8 * * 1-5 cd /Users/yourname/Misa-Auto-Checkin && ./random_checkin.sh 0 900 >> /tmp/misa.log 2>&1
-   
-   # Chấm công chiều: 17:45-18:15 (random 0-1800 giây = 0-30 phút), thứ 2-6
-   45 17 * * 1-5 cd /Users/yourname/Misa-Auto-Checkin && ./random_checkin.sh 0 1800 >> /tmp/misa.log 2>&1
-   ```
-
-3. Lưu file:
-   - Vim/Vi: Nhấn `Esc`, gõ `:wq`, Enter
-   - Nano: `Ctrl+X`, `Y`, Enter
-
-4. Kiểm tra cron đã thêm:
-   ```bash
-   crontab -l
-   ```
-
-**Giải thích:**
-- `0 8 * * 1-5` → 8:00 sáng, thứ 2-6
-- `./random_checkin.sh 0 900` → Script sẽ sleep random 0-900 giây (0-15 phút) trước khi chấm công
-- `>> /tmp/misa.log 2>&1` → Lưu log để debug
-
-**Tùy chỉnh khoảng thời gian random:**
 ```bash
-./random_checkin.sh <MIN_SECONDS> <MAX_SECONDS>
-
-# Ví dụ:
-./random_checkin.sh 0 600    # Random 0-10 phút
-./random_checkin.sh 0 1200   # Random 0-20 phút
-./random_checkin.sh 300 900  # Random 5-15 phút
+docker build -t misa-amis:local .
+docker run --rm --name misa-local -p 127.0.0.1:8000:8000 misa-amis:local uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
-#### Cách 2: Chạy trực tiếp (không random)
+Mở http://127.0.0.1:8000. Lệnh override Uvicorn bỏ prefix `/misa` vì đang chạy trực tiếp.
 
-Nếu muốn chấm công đúng giờ cố định:
-```cron
-# Sáng 8:00, chiều 18:00
-0 8 * * 1-5 cd /Users/yourname/Misa-Auto-Checkin && python3 auto_checkin.py >> /tmp/misa.log 2>&1
-0 18 * * 1-5 cd /Users/yourname/Misa-Auto-Checkin && python3 auto_checkin.py >> /tmp/misa.log 2>&1
-```
+### Chạy với Nginx gateway và Cloudflare Tunnel
 
-**Xem log để kiểm tra:**
+Compose mặc định dành cho route `/misa/`: container `misa-amis`, không publish cổng host, tham gia Docker network ngoài `nginx_default`. Nếu setup mới, tạo network trước; nếu đã có gateway thì dùng lại network đó:
+
 ```bash
-tail -f /tmp/misa.log
+docker network inspect nginx_default
+# Chỉ chạy lệnh sau nếu network chưa tồn tại:
+docker network create nginx_default
+docker compose up -d --build --wait
+docker compose ps
 ```
 
-## 🔧 Xử lý lỗi thường gặp
+Nginx gateway phải nằm cùng network để resolve `misa-amis`. Trong server block của domain, thêm các location trong `deploy/nginx-misa.conf`. Nginx bỏ `/misa` trước khi chuyển tới backend; Uvicorn chạy với `--root-path /misa`. URL static/API dùng đường dẫn tương đối để hoạt động cả localhost và `/misa/`.
 
-### ❌ `ModuleNotFoundError: No module named 'requests'`
-**Nguyên nhân:** Chưa cài đặt thư viện
-**Giải pháp:**
+Nếu gateway chặn quyền GPS bằng Permissions-Policy, cấu hình trong khối `http`:
+
+```nginx
+map $request_uri $permissions_policy {
+    default "geolocation=(), microphone=(), camera=()";
+    ~^/misa(/|$) "geolocation=(self), microphone=(), camera=()";
+}
+```
+
+Trong server block, thay header Permissions-Policy cũ bằng:
+
+```nginx
+add_header Permissions-Policy $permissions_policy always;
+```
+
+Kiểm tra trước khi reload:
+
 ```bash
-pip install -r requirements.txt
-# hoặc cài từng cái
-pip install requests pyotp python-dotenv
+docker exec nginx-gateway nginx -t
+docker exec nginx-gateway nginx -s reload
 ```
 
-### ❌ `KeyError: 'MISA_USERNAME'` hoặc biến môi trường None
-**Nguyên nhân:** File `.env` chưa tạo hoặc sai định dạng
-**Giải pháp:**
-1. Kiểm tra file `.env` có tồn tại trong cùng thư mục với `auto_checkin.py`
-2. Đảm bảo không có khoảng trắng thừa: `MISA_USERNAME=value` (không phải `MISA_USERNAME = value`)
-3. Không có dấu ngoặc kép thừa
+Với Cloudflare Tunnel hiện có, public hostname `lab14.io.vn` phải chuyển về Nginx gateway ở cổng 80. Nếu tunnel ở cùng Docker network có thể dùng `http://nginx-gateway:80`; nếu gateway publish cổng trên Docker Desktop, có thể dùng origin `http://host.docker.internal:80` như cấu hình hệ thống phù hợp. Dùng tunnel đã cấu hình trong Cloudflare; không commit tunnel token vào repo. Location MISA chuyển HTTP sang HTTPS và dùng HTTPS cho giao diện nhập bí mật.
 
-### ❌ `[-] Thất bại xác thực OTP`
-**Nguyên nhân:** Secret key sai hoặc thời gian hệ thống không chính xác
-**Giải pháp:**
-1. Kiểm tra lại `MISA_SECRET_KEY` trong file `.env`
-2. Đồng bộ thời gian hệ thống:
-   - **Windows:** Settings → Time & Language → Sync now
-   - **macOS:** System Preferences → Date & Time → Set date and time automatically
-   - **Linux:** `sudo ntpdate pool.ntp.org`
+Truy cập https://lab14.io.vn/misa/; `/misa` được chuyển sang `/misa/`. Kiểm tra:
 
-### ❌ `[-] Bị từ chối chấm công: GPS không hợp lệ`
-**Nguyên nhân:** Tọa độ GPS sai hoặc ngoài phạm vi cho phép
-**Giải pháp:**
-1. Kiểm tra lại `TARGET_LATITUDE` và `TARGET_LONGITUDE`
-2. Đảm bảo tọa độ là số thập phân (float), không phải độ/phút/giây
-3. Thử lấy lại tọa độ từ Google Maps
+```bash
+curl -f https://lab14.io.vn/misa/healthz
+curl -f https://lab14.io.vn/misa/api/locations
+docker compose logs --tail 50 misa
+```
 
-### ❌ Windows Task Scheduler không chạy
-**Giải pháp:**
-1. Kiểm tra đường dẫn Python đầy đủ: `where python` trong CMD
-2. Dùng đường dẫn tuyệt đối cho cả Python và script
-3. Hoặc tạo file `.bat` như hướng dẫn ở phần Tự động hóa
-4. Đảm bảo Task chạy với quyền user hiện tại (không cần Administrator)
+Cập nhật code/vị trí và triển khai lại:
 
-## 📝 Lưu ý quan trọng
+```bash
+git pull --ff-only
+docker compose up -d --build --wait
+```
 
-⚠️ **Bảo mật:**
-- File `.env` chứa thông tin nhạy cảm, **KHÔNG** commit lên Git
-- File `.gitignore` đã được cấu hình để bỏ qua `.env`
-- Không share Secret Key với người khác
+`.dockerignore` chỉ đưa file ứng dụng cần thiết vào image; loại `.env`, `.git` và dữ liệu local. Container chạy user thường, filesystem read-only, health check và tự restart. Sau khi sửa Nginx, luôn chạy `nginx -t` rồi mới reload. Để dừng riêng app: `docker compose down`; nếu gỡ route, chỉ gỡ block MISA khỏi Nginx để giữ các dịch vụ khác.
 
-⚠️ **Tính năng chống phát hiện:**
-- **Random Device Headers**: Mỗi lần chạy, tool tự động random thiết bị iOS (iPhone 13/14/15 Pro/Max) với version khác nhau để tránh bị phát hiện pattern
-- **Random Time**: Dùng `random_checkin.sh`/`random_checkin.bat` để random thời gian chấm công trong khoảng bạn chọn
-- Hai tính năng này giúp giảm rủi ro bị hệ thống phát hiện bot
+## 6. API và cấu trúc mã
 
-⚠️ **Sử dụng:**
-- Tool chỉ nên dùng cho mục đích cá nhân
-- Tuân thủ quy định nội bộ công ty về chấm công
-- Kiểm tra kỹ trước khi chạy tự động hằng ngày
+| Endpoint | Mục đích |
+| --- | --- |
+| `GET /` | Giao diện |
+| `GET /healthz` | Tình trạng ứng dụng |
+| `GET /api/locations` | Key, tên hiển thị và tọa độ |
+| `POST /api/checkins` | Tài khoản, mã nhân viên, GPS và device từ form |
 
-⚠️ **Thời gian:**
-- Đặt thời gian chạy trước giờ vào ca 5-10 phút để đề phòng lỗi mạng
-- Tránh chạy quá sớm (hệ thống có thể chưa mở ca)
-- Khuyến nghị dùng random time thay vì chấm đúng giờ cố định
+Khi triển khai qua gateway, thêm prefix `/misa` cho các endpoint. Swagger local ở http://127.0.0.1:8000/docs; JSON schema ở `/openapi.json`. API POST yêu cầu `username`, `password`, `employee_code`, `latitude`, `longitude`, `gps_name`, `device`; `secret_key` chỉ cần nếu MISA yêu cầu OTP. Device gồm `name`, `os`, `os_version` (có thể trống), `device_type` (Desktop/Smartphone/Tablet/Unknown), `user_agent`.
 
-## 📄 License
+- `auto_checkin.py`: model dữ liệu, đăng nhập, TOTP, ca làm, ký response token và chấm công.
+- `main.py`: FastAPI, static, API vị trí, validation và HTTP client riêng mỗi request.
+- `static/`: giao diện, thu thập device, ghi nhớ trên trình duyệt.
+- `constant/location.py`: các địa điểm cấu hình.
+- `Dockerfile`, `compose.yaml`, `deploy/nginx-misa.conf`: triển khai.
+- `tests/`: mock MISA và kiểm thử frontend.
 
-MIT License - Tự do sử dụng và chỉnh sửa
+## 7. Lỗi thường gặp
 
-## 🙏 Credits
+| Thông báo / triệu chứng | Cách xử lý |
+| --- | --- |
+| Tài khoản yêu cầu OTP | Điền khóa TOTP từ màn hình thiết lập MISA, không nhập OTP 6 số. |
+| SECRET_KEY không đúng Base32 | Copy lại khóa; khoảng trắng/chữ thường được xử lý tự động. Không dán toàn bộ URL QR vào ô khóa. |
+| MISA từ chối xác thực OTP | Kiểm tra khóa thuộc đúng tài khoản, đã hoàn tất liên kết và đồng hồ hệ thống đồng bộ. |
+| Mã nhân viên không khớp | Dùng mã nhân viên thuộc tài khoản vừa đăng nhập. |
+| Không lấy được GPS | Cấp quyền vị trí, dùng HTTPS/localhost và kiểm tra Permissions-Policy ở gateway. |
+| Timeout / mất kết nối / thiếu kết quả | Kiểm tra bản ghi trên AMIS trước khi gửi lại; ứng dụng không tự retry. |
+| Thiếu thông tin device sau cập nhật | Tải lại trang để frontend mới gửi đủ dữ liệu. |
+| 502 tại gateway | Kiểm tra container healthy, network Nginx và tên upstream `misa-amis`. |
 
-Tool được phát triển dựa trên reverse engineering API của MISA AMIS.
+API ứng dụng tham khảo từ repo gốc, không thuộc hợp đồng OpenAPI trong PDF; có thể thay đổi từ phía MISA. Không đảm bảo server MISA ghi nguồn `DataSourceID = 3`. Backend không ghi mật khẩu/khóa vào file hoặc database, không tái sử dụng phiên giữa người dùng. Nếu ca làm trả yêu cầu nhận diện khuôn mặt/xác nhận quản lý, app dừng và hướng dẫn dùng ứng dụng MISA. Bản này chưa có lớp đăng nhập riêng cho webapp; triển khai trong phạm vi được phép và bảo vệ đường truyền HTTPS.
 
----
+## 8. Kiểm thử
 
-**⭐ Nếu tool hữu ích, hãy cho repo một ngôi sao nhé! ⭐**
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+node --test tests/test_form.mjs
+```
+
+Kiểm thử dùng HTTP mock, không đăng nhập/chấm công thật. Bao gồm đăng nhập/OTP, chuẩn hóa khóa, mã nhân viên, header thiết bị, tọa độ, lỗi kết nối, không lộ bí mật trong lỗi, prefix reverse proxy và lưu/khôi phục dữ liệu form.
+
+## Giấy phép
+
+MIT — xem `LICENSE`. Giữ thông tin tác giả và giấy phép của repo gốc khi phân phối.

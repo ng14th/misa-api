@@ -86,6 +86,19 @@ try {
   rememberStatus.textContent = 'Không đọc được thông tin đã lưu. Bạn có thể nhập lại thông tin trên form.';
 }
 
+const autofillParams = new URLSearchParams(window.location.search);
+for (const [key, value] of new URLSearchParams(window.location.hash.slice(1))) {
+  autofillParams.set(key, value);
+}
+for (const [param, id] of Object.entries({username: 'username', employee_code: 'employee-code', secret_key: 'secret-key'})) {
+  if (autofillParams.has(param)) document.querySelector(`#${id}`).value = autofillParams.get(param);
+}
+if (autofillParams.has('location')) {
+  savedLocation = autofillParams.get('location');
+  coordinates = {};
+  document.querySelector('#gps-name').value = '';
+}
+
 remember.addEventListener('change', () => {
   if (saveInputs() && !remember.checked) rememberStatus.textContent = 'Đã tắt ghi nhớ. Mật khẩu và SECRET_KEY sẽ được xóa khỏi form sau khi gửi.';
 });
@@ -105,10 +118,11 @@ async function loadLocations() {
     if (restored) {
       locationSelect.value = restored.name;
       coordinates = {latitude: restored.latitude, longitude: restored.longitude};
+      if (autofillParams.has('location')) document.querySelector('#gps-name').value = restored.name;
       locationStatus.textContent = `Vĩ độ: ${restored.latitude} · Kinh độ: ${restored.longitude}`;
     } else if (savedLocation) {
       coordinates = {};
-      locationStatus.textContent = 'Vị trí đã lưu không còn trong cấu hình. Hãy chọn lại vị trí.';
+      locationStatus.textContent = 'Vị trí không có trong cấu hình. Hãy chọn lại vị trí.';
     } else if (coordinates.latitude !== undefined) {
       locationStatus.textContent = `Đã khôi phục GPS: ${coordinates.latitude}, ${coordinates.longitude}`;
     }

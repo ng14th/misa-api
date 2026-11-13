@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const script = fs.readFileSync(new URL('../static/app.js', import.meta.url), 'utf8');
 
-async function setup(storage = new Map(), failRequest = false, blockStorage = false, browserInfo = {userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Safari/605.1.15', platform: 'MacIntel'}) {
+async function setup(storage = new Map(), failRequest = false, blockStorage = false, browserInfo = {userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Safari/605.1.15', platform: 'MacIntel'}, url = 'https://example.test/misa/') {
   const elements = new Map();
   const element = selector => {
     if (!elements.has(selector)) elements.set(selector, {
@@ -21,6 +21,7 @@ async function setup(storage = new Map(), failRequest = false, blockStorage = fa
   let sent;
   const context = vm.createContext({
     document: {querySelector: element}, Intl, Date, setInterval() {}, navigator: browserInfo,
+    window: {location: new URL(url)}, URLSearchParams,
     Option: function(text, value) { this.text = text; this.value = value; },
     localStorage: {
       getItem: key => storage.get(key) ?? null,
@@ -79,6 +80,59 @@ test('without remember, network errors clear secrets and never write storage', a
   assert.equal(page.element('#password').value, '');
   assert.equal(page.element('#secret-key').value, '');
   assert.equal(storage.size, 0);
+});
+
+test('URL parameters autofill mobile credentials and configured location without submitting', async () => {
+  const storage = new Map();
+  const page = await setup(storage, false, false, undefined,
+    'https://example.test/misa/?username=%2B84901234567&employee_code=NV%2001&location=VP#secret_key=TEST%20KEY');
+  assert.equal(page.element('#username').value, '+84901234567');
+  assert.equal(page.element('#employee-code').value, 'NV 01');
+  assert.equal(page.element('#secret-key').value, 'TEST KEY');
+  assert.equal(page.element('#location').value, 'VP');
+  assert.equal(page.element('#gps-name').value, 'VP');
+  assert.equal(page.element('#password').value, '');
+  assert.equal(page.sent(), undefined);
+  assert.equal(storage.size, 0);
+  page.element('#password').value = 'test-password';
+  await page.submit();
+  assert.equal(page.sent().latitude, 10);
+  assert.equal(page.sent().longitude, 106);
+  assert.equal(page.sent().gps_name, 'VP');
+  assert.equal(page.sent().username, '+84901234567');
+  assert.equal(page.sent().employee_code, 'NV 01');
+  assert.equal(page.sent().secret_key, 'TEST KEY');
+});
+
+test('URL values override remembered fields and fragment overrides query', async () => {
+  const storage = new Map();
+  const first = await setup(storage);
+  first.fill();
+  first.element('#remember-inputs').checked = true;
+  first.element('#remember-inputs').listeners.change();
+  const page = await setup(storage, false, false, undefined,
+    'https://example.test/misa/?username=query&employee_code=NEW&secret_key=QUERY#username=fragment&secret_key=');
+  assert.equal(page.element('#username').value, 'fragment');
+  assert.equal(page.element('#employee-code').value, 'NEW');
+  assert.equal(page.element('#secret-key').value, '');
+  assert.equal(page.element('#password').value, 'test-password');
+  assert.equal(page.element('#location').value, 'VP');
+});
+
+test('unknown or empty URL location clears remembered GPS and blocks check-in', async () => {
+  for (const location of ['UNKNOWN', '']) {
+    const storage = new Map();
+    const first = await setup(storage);
+    first.fill();
+    first.element('#remember-inputs').checked = true;
+    first.element('#remember-inputs').listeners.change();
+    const page = await setup(storage, false, false, undefined,
+      `https://example.test/misa/?location=${location}`);
+    assert.equal(page.element('#gps-name').value, '');
+    await page.submit();
+    assert.equal(page.sent(), undefined);
+    assert.equal(page.element('#result').className, 'error');
+  }
 });
 
 test('storage failures are displayed honestly for save and removal', async () => {

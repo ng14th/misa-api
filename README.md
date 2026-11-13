@@ -75,6 +75,18 @@ API chấm công theo `userId` của tài khoản đăng nhập. Mã nhân viên
 
 Checkbox ghi nhớ mặc định tắt. Khi bật, username, password, SECRET_KEY, mã nhân viên, vị trí, tọa độ và tên GPS được lưu vào **localStorage trên trình duyệt này**, gồm bí mật ở dạng JavaScript cùng origin có thể đọc. Chỉ bật trên máy cá nhân. Bỏ chọn để xóa dữ liệu đã lưu. Khi không bật ghi nhớ, password và SECRET_KEY bị xóa khỏi form sau lần gửi. Dữ liệu ghi nhớ chỉ áp dụng cho trình duyệt và địa chỉ local đang sử dụng.
 
+### Tự điền bằng link trên điện thoại
+
+Thêm các tham số `username`, `employee_code`, `secret_key`, `location` vào link để tự điền form. `location` là key vị trí trong cấu hình, ví dụ `VPTRAKHUC`. Ví dụ với dữ liệu minh họa:
+
+```text
+http://127.0.0.1:8000/?username=0901234567&employee_code=NV000001&location=VPTRAKHUC#secret_key=YOUR_TOTP_SECRET
+```
+
+Thay địa chỉ localhost bằng địa chỉ webapp đang dùng khi mở trên điện thoại. Hỗ trợ tham số sau `?` và sau `#`; giá trị sau `#` ưu tiên nếu trùng tên. Nên đặt `secret_key` sau `#` để khóa không được gửi lên server trong URL request. Link vẫn chứa khóa bí mật, chỉ lưu riêng trên điện thoại cá nhân và không chia sẻ.
+
+Các trường có trong link ưu tiên hơn dữ liệu ghi nhớ; trường vắng mặt giữ nguyên. Giá trị rỗng sẽ xóa trường tương ứng. Vị trí không hợp lệ yêu cầu chọn lại, không dùng tọa độ cũ. Mã hóa ký tự đặc biệt trong giá trị (ví dụ dấu `+` là `%2B`, khoảng trắng là `%20`). Link không tự gửi chấm công, không tự bật ghi nhớ và không hỗ trợ truyền password; nhập mật khẩu rồi bấm **Ghi nhận chấm công**.
+
 ### Cấu hình danh sách vị trí
 
 Sửa `constant/location.py`, tuple theo thứ tự **(latitude, longitude)**:

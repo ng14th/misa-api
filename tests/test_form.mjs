@@ -119,6 +119,56 @@ test('URL values override remembered fields and fragment overrides query', async
   assert.equal(page.element('#location').value, 'VP');
 });
 
+test('URL password and remember opt-in persist credentials and resolved location on reload', async () => {
+  for (const remember of ['true', '1']) {
+    const storage = new Map();
+    const page = await setup(storage, false, false, undefined,
+      `https://example.test/misa/?username=account&employee_code=NV1&location=VP&remember=${remember}&password=query#password=p%2Ba%26ss%23%20word&secret_key=TESTKEY`);
+    assert.equal(page.element('#remember-inputs').checked, true);
+    assert.equal(page.element('#password').value, 'p+a&ss# word');
+    assert.equal(page.sent(), undefined);
+    const restored = await setup(storage);
+    assert.equal(restored.element('#remember-inputs').checked, true);
+    for (const id of ['username', 'password', 'secret-key', 'employee-code', 'gps-name', 'location']) {
+      assert.equal(restored.element(`#${id}`).value, page.element(`#${id}`).value);
+    }
+    await restored.submit();
+    assert.equal(restored.sent().password, 'p+a&ss# word');
+    assert.equal(restored.sent().latitude, 10);
+    assert.equal(restored.sent().longitude, 106);
+  }
+});
+
+test('URL remember opt-out removes saved data and secrets clear after submission', async () => {
+  for (const remember of ['false', '0']) {
+    const storage = new Map();
+    const first = await setup(storage);
+    first.fill();
+    first.element('#remember-inputs').checked = true;
+    first.element('#remember-inputs').listeners.change();
+    const page = await setup(storage, false, false, undefined,
+      `https://example.test/misa/?password=new-password&remember=true#remember=${remember}`);
+    assert.equal(page.element('#remember-inputs').checked, false);
+    assert.equal(storage.size, 0);
+    await page.submit();
+    assert.equal(page.sent().password, 'new-password');
+    assert.equal(page.element('#password').value, '');
+    assert.equal(page.element('#secret-key').value, '');
+  }
+});
+
+test('URL password alone does not enable storage and blocked remember storage reports failure', async () => {
+  const storage = new Map();
+  const page = await setup(storage, false, false, undefined,
+    'https://example.test/misa/#password=test-password&remember=invalid');
+  assert.equal(page.element('#password').value, 'test-password');
+  assert.equal(page.element('#remember-inputs').checked, false);
+  assert.equal(storage.size, 0);
+  const blocked = await setup(new Map(), false, true, undefined,
+    'https://example.test/misa/#password=test-password&remember=true&location=VP');
+  assert.match(blocked.element('#remember-status').textContent, /không cho phép/);
+});
+
 test('unknown or empty URL location clears remembered GPS and blocks check-in', async () => {
   for (const location of ['UNKNOWN', '']) {
     const storage = new Map();

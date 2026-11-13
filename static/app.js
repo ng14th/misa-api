@@ -90,13 +90,20 @@ const autofillParams = new URLSearchParams(window.location.search);
 for (const [key, value] of new URLSearchParams(window.location.hash.slice(1))) {
   autofillParams.set(key, value);
 }
-for (const [param, id] of Object.entries({username: 'username', employee_code: 'employee-code', secret_key: 'secret-key'})) {
+for (const [param, id] of Object.entries({username: 'username', password: 'password', employee_code: 'employee-code', secret_key: 'secret-key'})) {
   if (autofillParams.has(param)) document.querySelector(`#${id}`).value = autofillParams.get(param);
 }
 if (autofillParams.has('location')) {
   savedLocation = autofillParams.get('location');
   coordinates = {};
   document.querySelector('#gps-name').value = '';
+}
+const rememberParam = autofillParams.get('remember');
+if (rememberParam === 'true' || rememberParam === '1') {
+  remember.checked = true;
+} else if (rememberParam === 'false' || rememberParam === '0') {
+  remember.checked = false;
+  if (saveInputs()) rememberStatus.textContent = 'Đã tắt ghi nhớ. Mật khẩu và SECRET_KEY sẽ được xóa khỏi form sau khi gửi.';
 }
 
 remember.addEventListener('change', () => {
@@ -126,6 +133,7 @@ async function loadLocations() {
     } else if (coordinates.latitude !== undefined) {
       locationStatus.textContent = `Đã khôi phục GPS: ${coordinates.latitude}, ${coordinates.longitude}`;
     }
+    if (remember.checked && (rememberParam === 'true' || rememberParam === '1')) saveInputs();
   } catch {
     locationStatus.textContent = 'Không tải được danh sách vị trí. Tải lại trang để thử lại.';
   }
